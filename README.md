@@ -1,5 +1,5 @@
 # typo3-logrotate
-Custom LogWriter Beispiel mit LogRotate von Monolog. Umgesetzt mit der TYPO3 Version: 8.7.x
+Custom LogWriter Beispiel mit LogRotate von Monolog. Umgesetzt für die TYPO3 Version: 8.7.x und 9.5.x
 
 ### Problem
 Wenn die TYPO3 Logging Methode (auch) exzessiv auf Live genutzt wird, kann die Logdatei entsprechend groß werden. (Im besten Falle sollte dies natürlich nicht passieren!)
@@ -26,7 +26,8 @@ $GLOBALS['TYPO3_CONF_VARS']['LOG']['writerConfiguration'] = [
 Dies bedeutet das alle ErrorLevel ab Warning und höher geloggt werden. Dies ist auch empfehlenswert, da alles darunter recht unperformant wird. Ins Besondere wenn z.B. realurl läuft.
 
 ### Schritt 3 Monolog im CustomWriter integrieren
-* Monolog ist per Default bei TYPO3 dabei. Daher kann man die Klasse bequem im Konstruktor laden.
+* Version 8: Monolog ist per Default bei TYPO3 dabei. Daher kann man die Klasse bequem im Konstruktor laden.
+* Version 9: Mit ```php composer require monolog/monolog``` holen wir uns die Monolog Version. Achtet auf die Unterstützung der PHP Version
 * Die Rotation wird automatisch über den RotatingFileHandler gesteuert. Die Anzahl der Dateien wird über maxFiles gesteuert => https://github.com/Seldaek/monolog/blob/master/src/Monolog/Handler/RotatingFileHandler.php
 * Der Defaultpfad der Logdatei wurde angepasst
 * Die Eigenschaft maxFiles kann man als Option im CustomWriter ergänzen, so dass diese dann später per TCA steuerbar ist. Als Defaultwert habe ich mich für 7 Dateien entschieden.
@@ -108,10 +109,12 @@ $logger->notice('Notice', ['hello' => 'world']);
 $logger->debug('Debug', ['hello' => 'world']);
 ```
 
-# Quellen und Dankesagung
+In Version 9 beachten: Es gibt hier einen Logger Trait. Siehe https://docs.typo3.org/typo3cms/CoreApiReference/ApiOverview/Logging/Quickstart/Index.html
+
+# Quellen und Danksagung
 * Inspiration / Ideen kamen von Alexander Schnitzler
     * https://twitter.com/alex_schnitzler
-* Monolog Doku
+* Monolog Doku / Library
     * https://github.com/Seldaek/monolog
 * TYPO3 Dokumentation
     * https://docs.typo3.org/typo3cms/CoreApiReference/ApiOverview/Logging/Index.html
