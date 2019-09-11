@@ -15,6 +15,7 @@ namespace Ayacoo\AyacooProjectfiles\Writer;
  * The TYPO3 project - inspiring people to share!
  */
 
+use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Logger;
 use TYPO3\CMS\Core\Core\Environment;
@@ -47,7 +48,7 @@ class CustomWriterV9 extends AbstractWriter
      *
      * @var string
      */
-    protected $defaultLogFileTemplate = '/log/monolog.log';
+    protected $defaultLogFileTemplate = '/log/monolog_%s.log';
 
     /**
      * Log file handle storage
@@ -92,12 +93,24 @@ class CustomWriterV9 extends AbstractWriter
     /**
      * @var int
      */
-    protected $maxFiles = 7;
+    protected $maxFiles = 31;
+
+    /**
+     * @var bool
+     */
+    protected $folderDateFormat = true;
+
+    /**
+     * @var bool
+     */
+    protected $ignoreEmptyContextAndExtra = true;
 
     /**
      * Constructor, opens the log file handle
      *
      * @param array $options
+     *
+     * @throws InvalidLogWriterConfigurationException
      */
     public function __construct(array $options = [])
     {
@@ -107,19 +120,21 @@ class CustomWriterV9 extends AbstractWriter
             $this->setLogFile($this->getDefaultLogFileName());
         }
 
-        $this->log = new Logger('CustomWriter');
-        $this->log->pushHandler(new RotatingFileHandler($this->getLogFile(), $this->maxFiles));
+        $this->log = new Logger('LogRotateFileWriter');
+        $handler = new RotatingFileHandler($this->getLogFile(), $this->maxFiles);
+        if ($this->folderDateFormat) {
+            $handler->setFilenameFormat('{date}-{filename}', 'Y/m/Y-m-d');
+        }
+        $handler->setFormatter(new LineFormatter(null, null, false, $this->ignoreEmptyContextAndExtra));
+        $this->log->pushHandler($handler);
     }
 
     /**
-     * Destructor, closes the log file handle
+     * Destructor, closes connection to syslog.
      */
     public function __destruct()
     {
-        self::$logFileHandlesCount[$this->logFile]--;
-        if (self::$logFileHandlesCount[$this->logFile] <= 0) {
-            $this->closeLogFile();
-        }
+        closelog();
     }
 
     public function setLogFileInfix(string $infix)
@@ -148,7 +163,6 @@ class CustomWriterV9 extends AbstractWriter
             }
         }
         $this->logFile = $logFile;
-        $this->openLogFile();
 
         return $this;
     }
@@ -195,99 +209,11 @@ class CustomWriterV9 extends AbstractWriter
             $data
         );
 
-        /**
-        if (false === fwrite(self::$logFileHandles[$this->logFile], $message . LF)) {
-        throw new \RuntimeException('Could not write log record to log file', 1345036335);
-        }
-         */
-
         if (false === $this->log->addRecord(self::$monologLevels[$record->getLevel()], $message)) {
             throw new \RuntimeException('Could not write log record to log file', 1345036335);
         }
 
         return $this;
-    }
-
-    /**
-     * Opens the log file handle
-     *
-     * @throws \RuntimeException if the log file can't be opened.
-     */
-    protected function openLogFile()
-    {
-        if (isset(self::$logFileHandlesCount[$this->logFile])) {
-            self::$logFileHandlesCount[$this->logFile]++;
-        } else {
-            self::$logFileHandlesCount[$this->logFile] = 1;
-        }
-        if (isset(self::$logFileHandles[$this->logFile]) && is_resource(self::$logFileHandles[$this->logFile] ?? false)) {
-            return;
-        }
-
-        $this->createLogFile();
-        self::$logFileHandles[$this->logFile] = fopen($this->logFile, 'a');
-        if (!is_resource(self::$logFileHandles[$this->logFile])) {
-            throw new \RuntimeException('Could not open log file "' . $this->logFile . '"', 1321804422);
-        }
-    }
-
-    /**
-     * Closes the log file handle.
-     */
-    protected function closeLogFile()
-    {
-        if (!empty(self::$logFileHandles[$this->logFile]) && is_resource(self::$logFileHandles[$this->logFile])) {
-            fclose(self::$logFileHandles[$this->logFile]);
-            unset(self::$logFileHandles[$this->logFile]);
-        }
-    }
-
-    /**
-     * Creates the log file with correct permissions
-     * and parent directories, if needed
-     */
-    protected function createLogFile()
-    {
-        if (file_exists($this->logFile)) {
-            return;
-        }
-        $logFileDirectory = PathUtility::dirname($this->logFile);
-        if (!@is_dir($logFileDirectory)) {
-            GeneralUtility::mkdir_deep($logFileDirectory);
-            // create .htaccess file if log file is within the site path
-            if (PathUtility::getCommonPrefix([Environment::getPublicPath() . '/', $logFileDirectory]) === (Environment::getPublicPath() . '/')) {
-                // only create .htaccess, if we created the directory on our own
-                $this->createHtaccessFile($logFileDirectory . '/.htaccess');
-            }
-        }
-        // create the log file
-        GeneralUtility::writeFile($this->logFile, '');
-    }
-
-    /**
-     * Creates .htaccess file inside a new directory to access protect it
-     *
-     * @param string $htaccessFile Path of .htaccess file
-     */
-    protected function createHtaccessFile($htaccessFile)
-    {
-        // write .htaccess file to protect the log file
-        if (!empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['generateApacheHtaccess']) && !file_exists($htaccessFile)) {
-            $htaccessContent = '
-# Apache < 2.3
-<IfModule !mod_authz_core.c>
-	Order allow,deny
-	Deny from all
-	Satisfy All
-</IfModule>
-
-# Apache ≥ 2.3
-<IfModule mod_authz_core.c>
-	Require all denied
-</IfModule>
-			';
-            GeneralUtility::writeFile($htaccessFile, $htaccessContent);
-        }
     }
 
     /**
